@@ -250,3 +250,77 @@ Hash-based behavior signatures, not file hashes (Evasion-proof).
 Automatic rollback if ransomware encrypts <50 files.
 
 ---
+
+**Advanced Architecture Diagram**
+(Kernel → AI → Decision → Isolation → SOC)
+
+
+┌────────────────────────────────────────────────────────────┐
+│                    USER / FILE SYSTEM                                 │
+│   Documents | Databases | VM Volumes | Cloud Buckets                  │
+└───────────────┬────────────────────────────────────────────┘
+                   │
+                   ▼
+┌────────────────────────────────────────────────────────────┐
+│              KERNEL / LOW-LEVEL SENSOR LAYER                          │
+│                                                                       │
+│  ┌───────────────┐   ┌────────────────┐   ┌────────────┐.    │
+│  │ File MiniFilt │      │ eBPF / Kprobes │     │ ES Framework. │     │
+│  │ (NTFS / EXT4) │.     │ (Linux)        │     │ (macOS)       │     │
+│  └───────┬───────┘   └───────┬────────┘   └──────┬─────┘.    │
+│           │                      │                      │            │
+│  Entropy │            IO Pattern Hooks       Crypto API              │
+│  Monitor │        (read/write/rename)        Interception            │
+└──────────┼───────────────────┼────────────────────┼────--──┘
+             ▼                      ▼                       ▼
+┌────────────────────────────────────────────────────────────┐
+│                 TELEMETRY AGGREGATION BUS                             │
+│        (Shared Memory / Ring Buffers / Zero-Copy)                     │
+│                                                                       │
+│  File Entropy  |  IO Burst Sequences | Crypto API Calls               │
+│  Metadata      |  Process Tree       | Registry Events                │
+└──────────┬─────────────────────────────────────────────────┘
+             ▼
+┌────────────────────────────────────────────────────────────┐
+│                    AI ANALYSIS ENGINE                                 │
+│                                                                       │
+│  ┌────────────────┐   ┌─────────────────┐   ┌──────────┐     │
+│  │ Entropy Model     │   │ IO LSTM / HMM.     │   │ Proc ML    │.    │
+│  │ (GMM / KDE)       │   │ Behavior Model.    │   │ Classify.  │.    │
+│  └───────┬────────┘   └────────┬────────┘   └────┬─────┘.    │
+│           │                         │                   │            │
+│           └──────────────┬──────┴───────────--────┘            │
+│                            ▼                                         │
+│                Risk Score Fusion Engine                              │
+│           (Bayesian + Weighted Ensemble)                             │
+└──────────┬────────────────────────────────────────────────┘
+             ▼
+┌────────────────────────────────────────────────────────────┐
+│                 DECISION & POLICY ENGINE                   │
+│                                                            │
+│  Rules Engine + AI Confidence                              │
+│  - Threshold based isolation                               │
+│  - Adaptive false-positive dampening                       │
+│  - Per-user & per-process risk history                     │
+└──────────┬────────────────────────────────────────────────┘
+             ▼
+┌────────────────────────────────────────────────────────────┐
+│                 AUTOMATIC ISOLATION ENGINE                            │
+│                                                                       │
+│  ┌────────────┐ ┌───────────────┐ ┌──────────────────┐       │
+│  │ Dir Freeze   │ │ Process Kill.    │ │ Snapshot / Backup.  │       │
+│  │ ACL Lock.    │ │ Tree Terminate.  │ │ Shadow Restore      │       │
+│  └─────┬──────┘ └──────┬────────┘ └─────────┬────────┘       │
+│         │                  │                       │                 │
+│         └───────────────┴────────────┬───────┘                 │
+│                                           ▼                          │
+│                              Quarantine Vault                        │
+└──────────┬────────────────────────────────────────────────┘
+           ▼
+┌────────────────────────────────────────────────────────────┐
+│                SOC / XDR / SIEM LAYER                      │
+│                                                            │
+│  Alerts | Timeline | Heatmaps | MITRE ATT&CK Mapping       │
+│  API / Webhook / Slack / PagerDuty                         │
+└────────────────────────────────────────────────────────────┘
+
